@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld2
+  namespace: sample
+  labels:
+    app: helloworld2
+    service: helloworld2
+spec:
+  ports:
+  - port: 5000
+    name: http
+  selector:
+    app: helloworld2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld2-c1z1
+  namespace: sample
+  labels:
+    app: helloworld2
+    version: c1z1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld2
+      version: c1z1
+  template:
+    metadata:
+      labels:
+        app: helloworld2
+        zone: zone1
+        version: c1z1
+    spec:
+      containers:
+      - name: helloworld2
+        env:
+        - name: SERVICE_VERSION
+          value: c1z1
+        image: docker.io/istio/examples-helloworld-v1
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent
+      nodeSelector:
+        topology.kubernetes.io/zone: zone1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld2-c1z2
+  namespace: sample
+  labels:
+    app: helloworld2
+    version: c1z2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld2
+      version: c1z2
+  template:
+    metadata:
+      labels:
+        app: helloworld2
+        zone: zone2
+        version: c1z2
+    spec:
+      containers:
+      - name: helloworld2
+        env:
+        - name: SERVICE_VERSION
+          value: c1z2
+        image: docker.io/istio/examples-helloworld-v1
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+      nodeSelector:
+        topology.kubernetes.io/zone: zone2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld2-c1z3
+  namespace: sample
+  labels:
+    app: helloworld2
+    version: c1z3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld2
+      version: c1z3
+  template:
+    metadata:
+      labels:
+        app: helloworld2
+        zone: zone3
+        version: c1z3
+    spec:
+      containers:
+      - name: helloworld2
+        env:
+        - name: SERVICE_VERSION
+          value: c1z3
+        image: docker.io/istio/examples-helloworld-v1
+        resources:
+          requests:
+            cpu: "100m"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+      nodeSelector:
+        topology.kubernetes.io/zone: zone3

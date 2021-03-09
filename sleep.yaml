@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sleep
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sleep
+  labels:
+    app: sleep
+    service: sleep
+spec:
+  ports:
+  - port: 80
+    name: http
+  selector:
+    app: sleep
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: sleep
+    zone: zone1
+  name: sleepz1
+spec:
+  containers:
+  - name: sleep
+    image: curlimages/curl
+    command: ["/bin/sleep", "3650d"]
+    imagePullPolicy: IfNotPresent
+    resources: {}
+  nodeSelector:
+    topology.kubernetes.io/zone: zone1
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: sleep
+    zone: zone2
+  name: sleepz2
+spec:
+  containers:
+  - name: sleep
+    image: curlimages/curl
+    command: ["/bin/sleep", "3650d"]
+    imagePullPolicy: IfNotPresent
+    resources: {}
+  nodeSelector:
+    topology.kubernetes.io/zone: zone2
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: sleep
+    zone: zone3
+  name: sleepz3
+spec:
+  containers:
+  - name: sleep
+    image: curlimages/curl
+    command: ["/bin/sleep", "3650d"]
+    imagePullPolicy: IfNotPresent
+    resources: {}
+  nodeSelector:
+    topology.kubernetes.io/zone: zone3
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}

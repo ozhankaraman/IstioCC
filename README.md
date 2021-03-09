@@ -278,8 +278,8 @@ Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
 ```
 
 ## CC2: Locality Aware Load Balancing
-Here our aim is Istio to use Locality Aware Prioritised Load Balacing. With the setup below our data stays under same zone and
-it did not go to other zone infect there is a problem on current zone.
+Here our aim is, Istio to use Locality Aware Prioritised Load Balancing. With the setup below our data stays under same zone and
+it did not go to other zone until there is a problem or disaster on current zone.
 
 First lets check that we got reply from all zones
 ``` bash
@@ -339,8 +339,8 @@ Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
 Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
 ```
 
-Lets simulate a disaster lets drain Envoy proxy on helloworld2-c1z2 pod and lets check which pod replies our request.
-To drain pod execute the command below. I am draining c1z2 pod, if you have reply from other pods you need to update the command below.
+Lets simulate a disaster lets drain Envoy proxy on helloworld2-c1z2 pod and lets check which pods reply to our requests.
+To drain a pod execute the command below. Here I am draining c1z2 pod, if you have reply from other pods you need to update the command below.
 Drain pods take like a minute so you could query pod status to see pod ready is 1/2
 ``` bash
 kubectl exec --context=c1-admin -n sample -c istio-proxy $(kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
@@ -364,11 +364,181 @@ Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 ```
 
-## CC Senario 1: Locality Failover
-Here our plan is to apply locality failover over cluster 2 to simulate a complete failure on region2 Region. When the failure occurs
-the packages are redirected to region3 on clusters. This region3 could be hosted by any cluster.
+Cleanup Scenario
+``` bash
+kubectl exec --context=c1-admin -n sample -c istio-proxy $(kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
+kubectl delete --context=c1-admin -n sample vs/helloworld2
+kubectl delete --context=c1-admin -n sample dr/helloworld2-loc1
+```
 
-``` yaml
+## CC3: Locality Weighted Distribution Load Balancing
+Here our aim is, Istio to use Locality Weighted Distribution Load Balancing. With this setup we could redirect traffic from/to with a weighted distribution.
+Like the traffic coming from region1 with a sample distribution like 30% to region 2 and 20% to region 3 and remaining to region4. So we could control traffic 
+distribution between regions
+
+First lets check that we got reply from all zones
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c2z2, instance: helloworld2-c2z2-757dd89c66-7f4lw
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+```
+
+Apply below Virtual Service and Destination rule to activate weighted distribution load balancing
+Here we got 3 rules below to control traffic on region2 (Cluster 2) 
+On First Rule: Traffic coming from region2, zone1 distributed 50/50 to region1 and region3
+On Second Rule traffic coming from region2 zone2 will be distributed to region2 and region3
+On Third Rule traffic coming from region2 zone3 will be redirected all to region4, zone5 
+``` bash
+kubectl apply --context=c2-admin -n sample -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld2
+  namespace: sample
+spec:
+  hosts:
+    - helloworld2
+  http:
+  - route:
+    - destination:
+        host: helloworld2
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: helloworld2-loc2
+  namespace: sample
+spec:
+  host: helloworld2.sample.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        distribute:
+        - from: region2/zone1/*
+          to:
+            "region1/*": 50
+            "region3/*": 50
+        - from: region2/zone2/*
+          to:
+            "region2/zone3/*": 40
+            "region2/zone1/*": 40
+            "region3/*": 20
+        - from: region2/zone3/*
+          to:
+            "region4/zone5/*": 100
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+EOF
+```
+
+* For the first rule
+``` bash
+for count in `seq 1 10`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz1 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c3z1, instance: helloworld2-c3z1-cdf788db9-xrjr7
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+```
+
+* For the second rule
+``` bash
+for count in `seq 1 10`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
+```
+
+* For the third rule
+``` bash
+for count in `seq 1 10`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz3 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+```
+
+Cleanup Scenario
+``` bash
+kubectl delete --context=c2-admin -n sample vs/helloworld2
+kubectl delete --context=c2-admin -n sample dr/helloworld2-loc2
+```
+
+
+## CC4: Locality Failover
+Here our plan is to apply locality failover over cluster 2 to simulate a complete failure on region2 Region. When this failure occurs
+packages coming from region4 will be redirected to region3. 
+
+First lets send a request from region1 and check that region4 replies one or two of our requests. We need to get replies from c2z4 or c2z5 pods which are on region4
+``` bash
+for count in `seq 1 100`; do
+    kubectl exec --context=c1-admin -n sample -c sleep sleepz3 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+```
+
+Apply VR and DR to region4
+``` bash
+kubectl apply --context=c2-admin -n sample -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld2
+  namespace: sample
+spec:
+  hosts:
+    - helloworld2
+  http:
+  - route:
+    - destination:
+        host: helloworld2
+---
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
@@ -391,4 +561,64 @@ spec:
       consecutive5xxErrors: 1
       interval: 1s
       baseEjectionTime: 1m
+EOF
 ```
+
+Check that traffic stays on locally on same zone for region4
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+``` 
+
+To apply failover from region4 to region3 we drain helloworld2 listener on region4
+``` bash
+kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z4,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
+```
+
+Traffic redirected to the different zone on same region
+``` bash
+ for count in `seq 1 5`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
+```
+
+When we drain the helloworld2 pod on region4 zone5 this time traffic needs to be diverted to region3 services.
+``` bash
+kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z5,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
+```
+
+Check the traffic again in region4 you will see that its diverted to region3
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
+Hello version: c3z1, instance: helloworld2-c3z1-cdf788db9-xrjr7
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c3z1, instance: helloworld2-c3z1-cdf788db9-xrjr7
+```
+
+Cleanup Scenario
+``` bash
+kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z4,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
+kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z5,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
+kubectl delete --context=c2-admin -n sample vs/helloworld2
+kubectl delete --context=c2-admin -n sample dr/helloworld2-loc-failover
+```
+
+# Testing Istio DNS Proxy
