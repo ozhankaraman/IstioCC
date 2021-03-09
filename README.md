@@ -1,45 +1,40 @@
 # Istio 19 Cross Cluster and Cluster DNS Setup
-After Istio 1.7 old cross cluster design by defining service entries is depreciated and they moved to new Cross Cluster design with Multi Primary and Multi Primary Remote and some other variations. https://istio.io/latest/docs/setup/install/multicluster/ . There are some  articles on internet that after Istio 1.6 old Cluster Service Entry CC Design did not work as expected and it was broken ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ) , I read several tickets on Istio tickets that developers does not like to solve it.
+After Istio 1.7 cross cluster design by defining service entries became depreciated and they moved to a new Cross Cluster approach with Multi Primary, Multi Primary Remote Cluster Design. https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio site that after Istio 1.6 old Cluster Service Entry CC Design did not work as expected and its like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ).
 
-We are planning to use 3 clusters each named C1, C2 and C3. They have different region and zone structure. We could use any cluster installed on any cloud or onpremise platform. 
+You could get different cluster approaches from Istio documentation but here i plan to give some example scenarios about Istio Cross Cluster Usage. Here i am using 3 clusters named C1, C2 and C3. They have different region and zone setup. We could use any cluster installed on any cloud provider or onpremise platform. Important thing here is update the region and zone details with your current design and Load Balancer VIPS needs to be accessed by 3 clusters.
 
-Here i am using simple clusters installed with Kubeadm project, they each have 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks. So generally all pods are isolated from each other. You could think about these 3 clusters as clusters like in London, New York, Tokyo
+Here i am using 3 clusters installed with Kubeadm project, they each have 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks under same mesh topology. So generally all pods, services are isolated from each other, they could not directly communicate with each other. You could think these 3 clusters as clusters like in London, New York, Tokyo cities. You could get more data over the https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network link which give more details about how data flows from one clusters service to other clusters service.
 
-I used Istio Operator to manage Istio installation because it looks like its more native and used by most of the contributors and it has strong abilities on Cluster Upgrade and Troubleshooting. 
+I used Istio Operator to manage Istio installation because it looks like its more native, its used by most of the contributors and has strong abilities on Cluster Upgrade and Troubleshooting. 
 
-On Multi Primary Cluster Design on different networks https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network/because clusters are on different networks coupled services on different clusters are communicate over east-west egress gateways. And each Istiod Deployment queries different clusters API Server to get shared services/end point to their cluster. 
-
-Its also important that each cluster is using same CA that allows each cluster uses same root CA and then they could talk to each other without needed to define any federation on each other. By using same CA, clusters trust each other. https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/
+Its also important that each cluster is using same CA that allows to use same root CA and then they could talk to each other without need to define any federation on each cluster mesh. By using same CA, clusters trust each other. https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/
 
 I also enabled Istio Smart DNS Proxy to test how it works on cross cluster setup. It has a seamless integration with across multiple cluster and Virtual machines. 
 
-I generally used the cross cluster examples which comes with Istio bundle, generally nothing special here, only the official documentation is complex to understand for newcomer.
+I generally used the cross cluster examples which comes with Istio bundle, generally nothing special here, only the official documentation is somekind of complex to understand for a newcomer.
 
-Cross Cluster Nodes are in a form below:
-* C1 Cluster has 3 nodes(c1n1, c1n2, c1n3), all nodes are on same region(region1) and each node is on different zone(zone1, zone2, zone3)
-* C2 Cluster has 5 nodes(c2n1, c2n2, c2n3, c2n4, c2n5), first 3 nodes are on region2 and other 2 nodes are on region4 each node is on different zone(zone1, zone2, zone3, zone4, zone5)
-* C3 Cluster has 3 nodes(c3n1, c3n2, c3n3), all nodes are on same region(region3) and each node is on different zone(zone1, zone2, zone3)
+Cross Cluster Nodes are using the below zone and region distribution. Each Regions have different zones so zone1 from region1 is not zone as zone1 from region2
 
-Node | Region | Zone
---| -- | --
-c1n1 | region1 | zone1
-c1n2 | region1 | zone2
-c1n3 | region1 | zone2
--- | -- | -- 
-c2n1 | region2 | zone1
-c2n2 | region2 | zone2
-c2n3 | region2 | zone3
-c2n4 | region4 | zone4
-c2n5 | region4 | zone5
---| -- | --
-c3n1 | region3 | zone1
-c3n2 | region3 | zone2
-c3n3 | region3 | zone2
+Cluster | Node | Region | Zone
+-- | --| -- | --
+C1 | c1n1 | region1 | zone1
+C1 | c1n2 | region1 | zone2
+C1 | c1n3 | region1 | zone2
+-- | -- | -- | -- 
+C2 | c2n1 | region2 | zone1
+C2 | c2n2 | region2 | zone2
+C2 | c2n3 | region2 | zone3
+C2 | c2n4 | region4 | zone4
+C2 | c2n5 | region4 | zone5
+-- | --| -- | --
+C3 | c3n1 | region3 | zone1
+C3 | c3n2 | region3 | zone2
+C3 | c3n3 | region3 | zone2
 
-We use c1-admin, c2-admin, c3-admin kubectl context to reach clusters
+We use c1-admin, c2-admin, c3-admin kubectl contexts to reach clusters via kubectl or istioctl
 
-* We follow the below steps to build up a 3 node Cluster
-1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's each node is a seperate vm. 
+# We follow the below steps to build up a 3 node CC Cluster
+1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a seperate vm. 
 1. Label Nodes with Specific Region and Zone 
 1. Generate Common CA for all clusters and generate tls secret
 1. Deploy Istio Operator
@@ -79,7 +74,8 @@ kubectl --context=c3-admin label nodes c3n3 --overwrite topology.kubernetes.io/z
 ## Generate Common CA for all clusters and generate tls secret
 ``` bash
 # Below command is for macosx https://github.com/istio/istio/releases/tag/1.9.0
-wget https://github.com/istio/istio/releases/download/1.9.0/istio-1.9.0-osx.tar.gz && tar zxf istio-1.9.0-osx.tar.gz && rm -rf istio-1.9.0-osx.tar.gz
+wget https://github.com/istio/istio/releases/download/1.9.0/istio-1.9.0-osx.tar.gz && \
+  tar zxf istio-1.9.0-osx.tar.gz && rm -rf istio-1.9.0-osx.tar.gz
 mkdir istio-certs
 mkdir istio-certs/c1 istio-certs/c2 istio-certs/c3
 
