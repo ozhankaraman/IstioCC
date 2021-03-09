@@ -1,4 +1,4 @@
-# Istio 19 Cross Cluster and Cluster DNS Setup
+# Istio Version 1.9 Cross Cluster and Cluster DNS Setup
 After Istio 1.7 cross cluster design by defining service entries became depreciated and they moved to a new Cross Cluster approach with Multi Primary, Multi Primary Remote Cluster Design. https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio site that after Istio 1.6 old Cluster Service Entry CC Design did not work as expected and its like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ).
 
 You could get different cluster approaches from Istio documentation but here i plan to give some example scenarios about Istio Cross Cluster Usage. Here i am using 3 clusters named C1, C2 and C3. They have different region and zone setup. We could use any cluster installed on any cloud provider or onpremise platform. Important thing here is update the region and zone details with your current design and Load Balancer VIPS needs to be accessed by 3 clusters.
