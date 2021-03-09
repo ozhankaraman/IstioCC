@@ -1,19 +1,19 @@
 # Istio Version 1.9 Cross Cluster and Cluster DNS Setup
-After Istio 1.7 cross cluster design by defining service entries became depreciated and they moved to a new Cross Cluster approach with Multi Primary, Multi Primary Remote Cluster Design. https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio site that after Istio 1.6 old Cluster Service Entry CC Design did not work as expected and its like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ).
+After Istio 1.7 released, current cross cluster design by defining service entries became depreciated and Istio moved to a new Cluster Design with Multi Primary, Multi Primary Remote Cluster Design. More details could be get from official cross cluster documentation https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio mentiones that after Istio 1.6 old Cluster Service Entry Cross Cluster Design did not work as expected and its like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ). With this article I plan to give similar examples like Official Istio web site with some more or less definitions.
 
-You could get different cluster approaches from Istio documentation but here i plan to give some example scenarios about Istio Cross Cluster Usage. Here i am using 3 clusters named C1, C2 and C3. They have different region and zone setup. We could use any cluster installed on any cloud provider or onpremise platform. Important thing here is update the region and zone details with your current design and Load Balancer VIPS needs to be accessed by 3 clusters.
+Here I am using 3 geographical seperated clusters named C1, C2 and C3. They have different region and zone structure. You could use any cluster installed on any cloud provider or onpremise platform. Important thing here is if you dont have zone and region defined on your cluster you need to define it like below or if you already have that definitions(GCP, AWS, Azure has built in defined) its important to update the scenarios below to reflect your actual region, zone setup. By using Multi Primary Remote Multi Cluster Setup its important that Load Balancer VIPS needs to be accesible by all 3 clusters.
 
-Here i am using 3 clusters installed with Kubeadm project, they each have 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks under same mesh topology. So generally all pods, services are isolated from each other, they could not directly communicate with each other. You could think these 3 clusters as clusters like in London, New York, Tokyo cities. You could get more data over the https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network link which give more details about how data flows from one clusters service to other clusters service.
+Here i am using 3 clusters installed by Kubeadm project, each cluster has 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks under the same mesh topology. So generally all pods, services are isolated from each other, they could not directly communicate with each other via CNI. You could think these 3 clusters as clusters like in London, New York, Tokyo cities. You could get more data over the https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network link which give more details about how data flows from one clusters service to other.
 
-I used Istio Operator to manage Istio installation because it looks like its more native, its used by most of the contributors and has strong abilities on Cluster Upgrade and Troubleshooting. 
+I use Istio Operator to manage Istio installation because it looks like its more native and used by most of the contributors and also has strong abilities fot Cluster Upgrade and Troubleshooting. 
 
-Its also important that each cluster is using same CA that allows to use same root CA and then they could talk to each other without need to define any federation on each cluster mesh. By using same CA, clusters trust each other. https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/
+I also like to mention that each cluster is using same root CA that enables trust for each other, with this setup no federation required between them. https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/
 
 I also enabled Istio Smart DNS Proxy to test how it works on cross cluster setup. It has a seamless integration with across multiple cluster and Virtual machines. 
 
-I generally used the cross cluster examples which comes with Istio bundle, generally nothing special here, only the official documentation is somekind of complex to understand for a newcomer.
+I generally used the cross cluster examples which are detailed on current with Istio Install bundle, generally nothing special here, only the official documentation is somekind of complex to understand for a newcomer. I also executed all commands from my Mac, you could easily use this commands from other platforms with some minor modifications.
 
-Cross Cluster Nodes are using the below zone and region distribution. Each Regions have different zones so zone1 from region1 is not zone as zone1 from region2
+Cross Cluster Nodes are using the below zone and region distribution. Each regions have different zones so zone1 from region1 is not zone as zone1 from region2
 
 Cluster | Node | Region | Zone
 -- | --| -- | --
@@ -35,8 +35,8 @@ We use c1-admin, c2-admin, c3-admin kubectl contexts to reach clusters via kubec
 
 # We follow the below steps to build up a 3 node CC Cluster
 1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a seperate vm. 
-1. Label Nodes with Specific Region and Zone 
-1. Generate Common CA for all clusters and generate tls secret
+1. Label Nodes with Specific Region and Zone (if you do not have these)
+1. Generate Common CA for all clusters and generate tls secret for Istiod
 1. Deploy Istio Operator
 1. Deploy Istiod
 1. Deploy East-West Ingress GW to handle CC Communication
@@ -70,12 +70,14 @@ kubectl --context=c3-admin label nodes c3n2 --overwrite topology.kubernetes.io/z
 kubectl --context=c3-admin label nodes c3n3 --overwrite topology.kubernetes.io/region=region3
 kubectl --context=c3-admin label nodes c3n3 --overwrite topology.kubernetes.io/zone=zone3
 
-# You could also use topology.istio.io/subzone definition to define additional data about your node
-# like rack, dc, pdu or special key about a node
+# You could also use topology.istio.io/subzone definition to define additional infos about your nodes
+# like rack, dc, pdu or other special requirements. For example
+# kubectl --context=c3-admin label nodes c3n1 --overwrite topology.istio.io/subzone=rack1
+# kubectl --context=c3-admin label nodes c3n2 --overwrite topology.istio.io/subzone=rack2
 # kubectl --context=c3-admin label nodes c3n3 --overwrite topology.istio.io/subzone=rack3
 ```
 
-## Generate Common CA for all clusters and generate tls secret
+## Generate Common CA for all clusters and generate tls secret for Istiod
 ``` bash
 # Below command is for macosx https://github.com/istio/istio/releases/tag/1.9.0
 wget https://github.com/istio/istio/releases/download/1.9.0/istio-1.9.0-osx.tar.gz && \
@@ -101,7 +103,6 @@ kubectl --context=c1-admin create secret generic cacerts -n istio-system \
       --from-file=istio-certs/c1/root-cert.pem \
       --from-file=istio-certs/c1/cert-chain.pem
 
-
 # c2
 kubectl --context=c2-admin create namespace istio-system
 kubectl --context=c2-admin create secret generic cacerts -n istio-system \
@@ -109,7 +110,6 @@ kubectl --context=c2-admin create secret generic cacerts -n istio-system \
       --from-file=istio-certs/c2/ca-key.pem \
       --from-file=istio-certs/c2/root-cert.pem \
       --from-file=istio-certs/c2/cert-chain.pem
-
 
 # c3
 kubectl --context=c3-admin create namespace istio-system
@@ -202,6 +202,8 @@ spec:
 EOF
 ```
 
+Check all pods under istio-system are in Ready State before continue to next step
+
 ## Deploy East-West Ingress GW 
 ```
 istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster1 --network network1 | istioctl --context=c1-admin install -y -f -
@@ -232,7 +234,7 @@ kubectl --context=c3-admin apply -n istio-system -f ./istio-1.9.0/samples/multic
 ```
 
 ## Deploy Sample Pods for our tests
-Deploy helloworld2 and sleep pods on all regions and zones. With help of these pods we could apply regional cross cluster scenarios on three clusters
+Deploy helloworld2 and sleep pods and services on all regions and zones. With help of these pods we could apply regional cross cluster scenarios on three clusters
 ``` bash
 kubectl --context=c1-admin apply -f ./helloworld2-ns.yaml
 kubectl --context=c2-admin apply -f ./helloworld2-ns.yaml
@@ -254,8 +256,8 @@ kubectl --context=c3-admin apply -n sample -f sleep.yaml
 # Cross Cluster Scenarios
 
 ## CC1: Check Basic Cross Cluster Communication
-Here we send a request from C1 Cluster, sleepz2 pod(Region1, Zone2) to helloworld2 service
-on sample namespace and we got replies from the pods on all clusters so cross cluster communication is working
+Here we send a request from sleepz2 pod(C1 Cluster, Region1, Zone2, Sample NS) to helloworld2 service
+and we got replies from the pods in 3 Clusters, so we could say Yes Cross Cluster communication is working
 
 ``` bash
 for count in `seq 1 50`; do
@@ -278,8 +280,9 @@ Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
 ```
 
 ## CC2: Locality Aware Load Balancing
-Here our aim is, Istio to use Locality Aware Prioritised Load Balancing. With the setup below our data stays under same zone and
-it did not go to other zone until there is a problem or disaster on current zone.
+Here we are defining Locality Aware Prioritised Load Balancing on C1. With this setup below our data transfer stays under same zone and
+it did not travel to other zones until there is a problem on current zone. This locality aware approach is important because most Cloud 
+Providers extra charge the data which travels between zones while they actually dont charge data which remains under the same zone.
 
 First lets check that we got reply from all zones
 ``` bash
@@ -294,10 +297,8 @@ Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
 Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
 ```
 
-Apply below Virtual Service and Destination rule to activate locality aware load balancing, here below adding 
+Apply below Virtual Service and Destination Rule to activate locality aware load balancing, here below adding 
 outlier detection is important to make it work, also one more thing there is no localityLBSetting below so data will remain on same zone.
-This locality aware approach is important because Cloud Providers extra charge data which travels between zones while under same zone 
-they do not charge anything extra.
 ``` bash
 kubectl apply --context=c1-admin -n sample -f - <<EOF
 apiVersion: networking.istio.io/v1alpha3
@@ -326,7 +327,7 @@ spec:
 EOF
 ```
 
-Send same request again and you will notice that data stays on zone
+Send same request again and you will notice that data stays under same zone
 ``` bash
 for count in `seq 1 5`; do
     kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
@@ -339,9 +340,10 @@ Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
 Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
 ```
 
-Lets simulate a disaster lets drain Envoy proxy on helloworld2-c1z2 pod and lets check which pods reply to our requests.
-To drain a pod execute the command below. Here I am draining c1z2 pod, if you have reply from other pods you need to update the command below.
-Drain pods take like a minute so you could query pod status to see pod ready is 1/2
+Lets simulate a disaster, lets drain Envoy proxy on helloworld2-c1z2 pod and lets check which pods reply to our requests.
+To drain a pod execute the command below. Here I am draining c1z2 pod, if you got reply from other pods you need to update
+the command by your setup.
+Drain pods will take like a minute or less, you could query pod status to check if drain operation is applied and pod ready status is 1/2
 ``` bash
 kubectl exec --context=c1-admin -n sample -c istio-proxy $(kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
 
@@ -351,7 +353,7 @@ NAME                                READY   STATUS    RESTARTS   AGE
 helloworld2-c1z2-69dfd5c6f4-q9ww4   1/2     Running   0          6d22h
 ```
 
-Send same request again and you will notice that now we got replies from pods on different zones but in same cluster
+Send same request again and you will notice that now we got replies from pods on different zones but again under same cluster
 ``` bash
 for count in `seq 1 5`; do
     kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
@@ -372,9 +374,8 @@ kubectl delete --context=c1-admin -n sample dr/helloworld2-loc1
 ```
 
 ## CC3: Locality Weighted Distribution Load Balancing
-Here our aim is, Istio to use Locality Weighted Distribution Load Balancing. With this setup we could redirect traffic from/to with a weighted distribution.
-Like the traffic coming from region1 with a sample distribution like 30% to region 2 and 20% to region 3 and remaining to region4. So we could control traffic 
-distribution between regions
+Here we are defining Locality Weighted Distribution Load Balancing. With this setup we could redirect, control traffic from or to with a weighted distribution.
+For example we could divert coming from region1 zone1 to 50% region2 20% region3 and 30% to region4. So we could control traffic flow.
 
 First lets check that we got reply from all zones
 ``` bash
@@ -391,9 +392,12 @@ Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
 
 Apply below Virtual Service and Destination rule to activate weighted distribution load balancing
 Here we got 3 rules below to control traffic on region2 (Cluster 2) 
-On First Rule: Traffic coming from region2, zone1 distributed 50/50 to region1 and region3
-On Second Rule traffic coming from region2 zone2 will be distributed to region2 and region3
-On Third Rule traffic coming from region2 zone3 will be redirected all to region4, zone5 
+First Rule: Traffic coming from region2, zone1 distributed 50/50 to region1 and region3
+Second Rule traffic coming from region2 zone2 will be distributed to region2 and region3
+Third Rule traffic coming from region2 zone3 will be redirected all to region4, zone5 
+
+Note: We could not control destination traffic on zone basis if from and to traffic is on different regions. 
+If they are on same region we could control destination zone.
 ``` bash
 kubectl apply --context=c2-admin -n sample -f - <<EOF
 apiVersion: networking.istio.io/v1alpha3
@@ -500,9 +504,8 @@ kubectl delete --context=c2-admin -n sample vs/helloworld2
 kubectl delete --context=c2-admin -n sample dr/helloworld2-loc2
 ```
 
-
 ## CC4: Locality Failover
-Here our plan is to apply locality failover over cluster 2 to simulate a complete failure on region2 Region. When this failure occurs
+Here our plan is to apply locality failover over C2 cluster to simulate a complete failure on region2 Region. When this failure happen
 packages coming from region4 will be redirected to region3. 
 
 First lets send a request from region1 and check that region4 replies one or two of our requests. We need to get replies from c2z4 or c2z5 pods which are on region4
@@ -523,7 +526,7 @@ Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
 ```
 
-Apply VR and DR to region4
+Apply VR and DR to c2 cluster
 ``` bash
 kubectl apply --context=c2-admin -n sample -f - <<EOF
 apiVersion: networking.istio.io/v1alpha3
@@ -564,7 +567,7 @@ spec:
 EOF
 ```
 
-Check that traffic stays on locally on same zone for region4
+Check that traffic stays locally on same zone for region4
 ``` bash
 for count in `seq 1 5`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
