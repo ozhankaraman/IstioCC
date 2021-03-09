@@ -69,6 +69,10 @@ kubectl --context=c3-admin label nodes c3n2 --overwrite topology.kubernetes.io/r
 kubectl --context=c3-admin label nodes c3n2 --overwrite topology.kubernetes.io/zone=zone2
 kubectl --context=c3-admin label nodes c3n3 --overwrite topology.kubernetes.io/region=region3
 kubectl --context=c3-admin label nodes c3n3 --overwrite topology.kubernetes.io/zone=zone3
+
+# You could also use topology.istio.io/subzone definition to define additional data about your node
+# like rack, dc, pdu or special key about a node
+# kubectl --context=c3-admin label nodes c3n3 --overwrite topology.istio.io/subzone=rack3
 ```
 
 ## Generate Common CA for all clusters and generate tls secret
@@ -227,3 +231,164 @@ kubectl --context=c3-admin apply -n istio-system -f ./istio-1.9.0/samples/multic
 ./istio-1.9.0/bin/istioctl x create-remote-secret --context=c2-admin --name=cluster2 | kubectl apply -f - --context=c3-admin
 ```
 
+## Deploy Sample Pods for our tests
+Deploy helloworld2 and sleep pods on all regions and zones. With help of these pods we could apply regional cross cluster scenarios on three clusters
+``` bash
+kubectl --context=c1-admin apply -f ./helloworld2-ns.yaml
+kubectl --context=c2-admin apply -f ./helloworld2-ns.yaml
+kubectl --context=c3-admin apply -f ./helloworld2-ns.yaml
+
+kubectl --context=c1-admin apply -f ./helloworld2-c1.yaml
+kubectl --context=c2-admin apply -f ./helloworld2-c2.yaml
+kubectl --context=c3-admin apply -f ./helloworld2-c3.yaml
+
+kubectl --context=c1-admin apply -n sample -f sleep-ns.yaml
+kubectl --context=c2-admin apply -n sample -f sleep-ns.yaml
+kubectl --context=c3-admin apply -n sample -f sleep-ns.yaml
+
+kubectl --context=c1-admin apply -n sample -f sleep.yaml
+kubectl --context=c2-admin apply -n sample -f sleep.yaml
+kubectl --context=c3-admin apply -n sample -f sleep.yaml
+```
+
+# Cross Cluster Scenarios
+
+## CC1: Check Basic Cross Cluster Communication
+Here we send a request from C1 Cluster, sleepz2 pod(Region1, Zone2) to helloworld2 service
+on sample namespace and we got replies from the pods on all clusters so cross cluster communication is working
+
+``` bash
+for count in `seq 1 50`; do
+    kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c2z1, instance: helloworld2-c2z1-5df4555cd9-tkbtb
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+```
+
+## CC2: Locality Aware Load Balancing
+Here our aim is Istio to use Locality Aware Prioritised Load Balacing. With the setup below our data stays under same zone and
+it did not go to other zone infect there is a problem on current zone.
+
+First lets check that we got reply from all zones
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
+```
+
+Apply below Virtual Service and Destination rule to activate locality aware load balancing, here below adding 
+outlier detection is important to make it work, also one more thing there is no localityLBSetting below so data will remain on same zone.
+This locality aware approach is important because Cloud Providers extra charge data which travels between zones while under same zone 
+they do not charge anything extra.
+``` bash
+kubectl apply --context=c1-admin -n sample -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: helloworld2
+spec:
+  hosts:
+    - helloworld2
+  http:
+  - route:
+    - destination:
+        host: helloworld2
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: helloworld2-loc1
+spec:
+  host: helloworld2
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 1s
+      baseEjectionTime: 30s
+EOF
+```
+
+Send same request again and you will notice that data stays on zone
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+Hello version: c1z2, instance: helloworld2-c1z2-69dfd5c6f4-q9ww4
+```
+
+Lets simulate a disaster lets drain Envoy proxy on helloworld2-c1z2 pod and lets check which pod replies our request.
+To drain pod execute the command below. I am draining c1z2 pod, if you have reply from other pods you need to update the command below.
+Drain pods take like a minute so you could query pod status to see pod ready is 1/2
+``` bash
+kubectl exec --context=c1-admin -n sample -c istio-proxy $(kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
+
+# Check Drain progress
+kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2
+NAME                                READY   STATUS    RESTARTS   AGE
+helloworld2-c1z2-69dfd5c6f4-q9ww4   1/2     Running   0          6d22h
+```
+
+Send same request again and you will notice that now we got replies from pods on different zones but in same cluster
+``` bash
+for count in `seq 1 5`; do
+    kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
+done
+
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z1, instance: helloworld2-c1z1-59ccb7b69d-22gbt
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
+```
+
+## CC Senario 1: Locality Failover
+Here our plan is to apply locality failover over cluster 2 to simulate a complete failure on region2 Region. When the failure occurs
+the packages are redirected to region3 on clusters. This region3 could be hosted by any cluster.
+
+``` yaml
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: helloworld2-loc-failover
+  namespace: sample
+spec:
+  host: helloworld2.sample.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        maxRequestsPerConnection: 1
+    loadBalancer:
+      simple: ROUND_ROBIN
+      localityLbSetting:
+        enabled: true
+        failover:
+          - from: region4
+            to: region3
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 1m
+```
