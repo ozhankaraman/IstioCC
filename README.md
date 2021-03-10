@@ -369,7 +369,7 @@ Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 ```
 
-Cleanup Scenario
+Scenario Cleanup
 ``` bash
 kubectl exec --context=c1-admin -n sample -c istio-proxy $(kubectl --context=c1-admin -n sample get pods -l version=c1z2,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
 kubectl delete --context=c1-admin -n sample vs/helloworld2
@@ -501,7 +501,7 @@ Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
 Hello version: c2z5, instance: helloworld2-c2z5-5bd5d7b5b7-c7xkh
 ```
 
-Cleanup Scenario
+Scenario Cleanup
 ``` bash
 kubectl delete --context=c2-admin -n sample vs/helloworld2
 kubectl delete --context=c2-admin -n sample dr/helloworld2-loc2
@@ -619,7 +619,7 @@ Hello version: c3z3, instance: helloworld2-c3z3-bbd675db5-bvj7z
 Hello version: c3z1, instance: helloworld2-c3z1-cdf788db9-xrjr7
 ```
 
-Cleanup Scenario
+Scenario Cleanup
 ``` bash
 kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z4,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
 kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z5,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- /bin/sh -c "kill 1"
@@ -628,15 +628,16 @@ kubectl delete --context=c2-admin -n sample dr/helloworld2-loc-failover
 ```
 
 # Testing Istio DNS Proxy
-With this new addon DNS queries can be cached on Istio Sidecar, this reduces queries send to Kubernetes DNS Server(kube-dns deployment) and has some additional functional benefits. In general all dns requests coming from application pod is redirected to kube-dns server via Istio sidecar this requests to kube-dns service and then sends reply to application. With this adaptation here Istio Sidecar has a caching DNS daemon, it caches requests and replies this requests to the application. This approach has a good performance effect and has some editional benefits listed below:
+With this new DNS Proxy Addon, DNS queries can be cached and controlled directly on Istio Sidecars, this reduces queries send to Kubernetes DNS Server(kube-dns deployment) and has some additional functional benefits. In general all dns requests coming from application pod is redirected to kube-dns server via Istio sidecar this requests to kube-dns service and then sends reply to application. With this adaptation here Istio Sidecar has a caching DNS daemon, it caches requests and replies this requests to the application. This approach has some editional benefits listed below:
 * VM access to Kubernetes services
 * Access external services without VIPs
 * Resolving DNS for services in remote clusters
+
 You could get more information from the below links:
 * https://preliminary.istio.io/latest/blog/2020/dns-proxy/?utm_source=thenewstack&utm_medium=website&utm_campaign=platform
 * https://istio.io/latest/docs/ops/configuration/traffic-management/dns-proxy/
 
-## DNSP 1: DNS Auto Allocation Example 1
+## DNSP 1: DNS Auto Allocation
 With DNS Auto Allocation feature, when you define an external service entry you get an auto generated non routable Class E(240.240.0.0/16) IP Address and then your application uses this stable/fixed IP address to access external services this has huge benefits for non-HTTP TCP communication. 
 
 Lets define istio.io as a external service entry on our cluster.
@@ -677,17 +678,17 @@ You could also check proxy config for istio.io definition using the istioctl pro
 ./istio-1.9.0/bin/istioctl proxy-config clusters sleepz2 -o json
 ```
 
-Cleanup Scenario
+Scenario Cleanup 
 ``` bash
 kubectl --context=c1-admin -n sample delete se/istio-io
 ```
 
-## DNSP 2: DNS Auto Allocation Example 2
-Istio has some limitations on routing external tcp traffic on same destination port number, it could not distinguish between two different tcp services. To solve this issue on previous versions without IP Auto Alllocation we use different port numbers for different services. 
+## DNSP 2: DNS Auto Allocation
+Istio has some limitations on routing external tcp traffic with same destination port numbers, it could not distinguish between two different tcp services if they have same destination ports. To workaround this issue on previous versions of Istio without IP Auto Allocation we use different port numbers for different services. 
 
-Lets define 2 database services using same port number as below
+Lets define 2 database services using same port number like below:
 
-``` yaml
+``` bash
 kubectl apply --context=c1-admin -n sample -f - <<EOF
 apiVersion: networking.istio.io/v1alpha3
 kind: ServiceEntry
@@ -717,20 +718,20 @@ spec:
 EOF
 ```
 
-When we check the listeners on pod we get a result like below, so one service is there with 0.0.0.0:3306 definition. So to seperate them from each other before Ip Auto Allocation feature we use 2 seperate ports.
+When we check the listeners on pod we get results like below, so only one service is there with 0.0.0.0:3306 definition.
 ``` bash
 ./istio-1.9.0/bin/istioctl pc listeners sleepz2 | grep database
 0.0.0.0     3306  ALL                                                     Cluster: outbound|3306||database-2.wecve5t321.eu-central-1.rds.amazonaws.com
 ```
 
-With the help of new ISTIO_META_DNS_AUTO_ALLOCATE we could use both services without defining 2 seperate Ports. With new feature we got the result below:
+With the help of new ISTIO_META_DNS_AUTO_ALLOCATE we could use both services without defining 2 seperate ports. With new feature we got the result below with auto allocated non routable IP addresses:
 ``` bash
 ./istio-1.9.0/bin/istioctl pc listeners sleepz2 | grep database
 240.240.0.2 3306  ALL                                                     Cluster: outbound|3306||database-1.wecve5t321.eu-central-1.rds.amazonaws.com
 240.240.0.3 3306  ALL                                                     Cluster: outbound|3306||database-2.wecve5t321.eu-central-1.rds.amazonaws.com
 ```
 
-Cleanup Scenario
+Scenario Cleanup
 ``` bash
 kubectl --context=c1-admin -n sample delete se/mysql-db-1
 kubectl --context=c1-admin -n sample delete se/mysql-db-2
