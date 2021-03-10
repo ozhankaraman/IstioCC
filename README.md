@@ -151,6 +151,7 @@ spec:
     defaultConfig:
       proxyMetadata:
         ISTIO_META_DNS_CAPTURE: "true"
+        ISTIO_META_DNS_AUTO_ALLOCATE: "true"
 EOF
 
 # c2
@@ -175,6 +176,7 @@ spec:
     defaultConfig:
       proxyMetadata:
         ISTIO_META_DNS_CAPTURE: "true"
+        ISTIO_META_DNS_AUTO_ALLOCATE: "true"
 EOF
 
 # c3
@@ -199,6 +201,7 @@ spec:
     defaultConfig:
       proxyMetadata:
         ISTIO_META_DNS_CAPTURE: "true"
+        ISTIO_META_DNS_AUTO_ALLOCATE: "true"
 EOF
 ```
 
@@ -625,3 +628,110 @@ kubectl delete --context=c2-admin -n sample dr/helloworld2-loc-failover
 ```
 
 # Testing Istio DNS Proxy
+With this new addon DNS queries can be cached on Istio Sidecar, this reduces queries send to Kubernetes DNS Server(kube-dns deployment) and has some additional functional benefits. In general all dns requests coming from application pod is redirected to kube-dns server via Istio sidecar this requests to kube-dns service and then sends reply to application. With this adaptation here Istio Sidecar has a caching DNS daemon, it caches requests and replies this requests to the application. This approach has a good performance effect and has some editional benefits listed below:
+* VM access to Kubernetes services
+* Access external services without VIPs
+* Resolving DNS for services in remote clusters
+You could get more information from the below links:
+* https://preliminary.istio.io/latest/blog/2020/dns-proxy/?utm_source=thenewstack&utm_medium=website&utm_campaign=platform
+* https://istio.io/latest/docs/ops/configuration/traffic-management/dns-proxy/
+
+## DNSP 1: DNS Auto Allocation Example 1
+With DNS Auto Allocation feature, when you define an external service entry you get an auto generated non routable Class E(240.240.0.0/16) IP Address and then your application uses this stable/fixed IP address to access external services this has huge benefits for non-HTTP TCP communication. 
+
+Lets define istio.io as a external service entry on our cluster.
+``` bash
+kubectl apply --context=c1-admin -n sample -f - <<EOF
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+ name: istio-io
+spec:
+ hosts:
+ - istio.io
+ location: MESH_EXTERNAL
+ ports:
+ - number: 443
+   name: https
+   protocol: TLS
+ resolution: DNS
+ EOF
+ ```
+
+ Lets Query istio.io and check which ip address its using
+ ``` bash
+ kubectl exec --context=c1-admin -n sample -c sleep sleepz2 -- curl https://istio.io
+
+*   Trying 240.240.0.1:443...
+* Connected to istio.io (240.240.0.1) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+* successfully set certificate verify locations:
+```
+
+So here we get class E non routable automatically assigned ip address 240.240.0.1 and we could access istio web site successfully. Istio converts this IP address to actual IP on fly and handles all routing.
+
+You could also check proxy config for istio.io definition using the istioctl proxy-config command. You could see all definition details there.
+``` bash
+./istio-1.9.0/bin/istioctl proxy-config listeners sleepz2 -o json
+./istio-1.9.0/bin/istioctl proxy-config clusters sleepz2 -o json
+```
+
+Cleanup Scenario
+``` bash
+kubectl --context=c1-admin -n sample delete se/istio-io
+```
+
+## DNSP 2: DNS Auto Allocation Example 2
+Istio has some limitations on routing external tcp traffic on same destination port number, it could not distinguish between two different tcp services. To solve this issue on previous versions without IP Auto Alllocation we use different port numbers for different services. 
+
+Lets define 2 database services using same port number as below
+
+``` yaml
+kubectl apply --context=c1-admin -n sample -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+ name: mysql-db-1
+spec:
+ hosts:
+ - database-1.wecve5t321.eu-central-1.rds.amazonaws.com
+ ports:
+ - number: 3306
+   name: tcp
+   protocol: TCP
+ resolution: DNS
+ ---
+ apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+ name: mysql-db-2
+spec:
+ hosts:
+ - database-2.wecve5t321.eu-central-1.rds.amazonaws.com
+ ports:
+ - number: 3306
+   name: tcp
+   protocol: TCP
+ resolution: DNS
+EOF
+```
+
+When we check the listeners on pod we get a result like below, so one service is there with 0.0.0.0:3306 definition. So to seperate them from each other before Ip Auto Allocation feature we use 2 seperate ports.
+``` bash
+./istio-1.9.0/bin/istioctl pc listeners sleepz2 | grep database
+0.0.0.0     3306  ALL                                                     Cluster: outbound|3306||database-2.wecve5t321.eu-central-1.rds.amazonaws.com
+```
+
+With the help of new ISTIO_META_DNS_AUTO_ALLOCATE we could use both services without defining 2 seperate Ports. With new feature we got the result below:
+``` bash
+./istio-1.9.0/bin/istioctl pc listeners sleepz2 | grep database
+240.240.0.2 3306  ALL                                                     Cluster: outbound|3306||database-1.wecve5t321.eu-central-1.rds.amazonaws.com
+240.240.0.3 3306  ALL                                                     Cluster: outbound|3306||database-2.wecve5t321.eu-central-1.rds.amazonaws.com
+```
+
+Cleanup Scenario
+``` bash
+kubectl --context=c1-admin -n sample delete se/mysql-db-1
+kubectl --context=c1-admin -n sample delete se/mysql-db-2
+```
