@@ -447,7 +447,7 @@ spec:
 EOF
 ```
 
-* For the first rule
+* Testing first rule
 ``` bash
 for count in `seq 1 10`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz1 -- curl -sS helloworld2.sample:5000/hello
@@ -465,7 +465,7 @@ Hello version: c1z3, instance: helloworld2-c1z3-8546875b76-jvrm7
 Hello version: c3z2, instance: helloworld2-c3z2-57dff95bbb-8nqvf
 ```
 
-* For the second rule
+* Testing second rule
 ``` bash
 for count in `seq 1 10`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz2 -- curl -sS helloworld2.sample:5000/hello
@@ -483,7 +483,7 @@ Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
 Hello version: c2z3, instance: helloworld2-c2z3-7d557ff6d9-dvgmd
 ```
 
-* For the third rule
+* Testing third rule
 ``` bash
 for count in `seq 1 10`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz3 -- curl -sS helloworld2.sample:5000/hello
@@ -590,7 +590,7 @@ kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-
 
 Traffic redirected to the different zone on same region
 ``` bash
- for count in `seq 1 5`; do
+for count in `seq 1 5`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
 done
 
