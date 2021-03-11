@@ -724,7 +724,7 @@ When we check the listeners on pod we get results like below, so only one servic
 0.0.0.0     3306  ALL                                                     Cluster: outbound|3306||database-2.wecve5t321.eu-central-1.rds.amazonaws.com
 ```
 
-With the help of new ISTIO_META_DNS_AUTO_ALLOCATE we could use both services without defining 2 seperate ports. With new feature we got the result below with auto allocated non routable IP addresses:
+With the help of new ISTIO_META_DNS_AUTO_ALLOCATE we could use both services without defining 2 separate ports. With new feature we got the result below with auto allocated non routable IP addresses:
 ``` bash
 ./istio-1.9.0/bin/istioctl pc listeners sleepz2 | grep database
 240.240.0.2 3306  ALL                                                     Cluster: outbound|3306||database-1.wecve5t321.eu-central-1.rds.amazonaws.com
