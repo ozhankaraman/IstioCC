@@ -1,19 +1,19 @@
 # Istio Version 1.9 Cross Cluster and Cluster DNS Setup
-After Istio 1.7 released, current cross cluster design by defining service entries became depreciated and Istio moved to a new Cluster Design with Multi Primary, Multi Primary Remote Cluster Design. More details could be get from official cross cluster documentation https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio mentiones that after Istio 1.6 old Cluster Service Entry Cross Cluster Design did not work as expected and its like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ). With this article I plan to give similar examples like Official Istio web site with some more or less definitions.
+After Istio 1.7 released, current cross cluster design by defining service entries became depreciated and Istio moved to a new Cluster Design with Multi Primary, Multi Primary Remote Cluster Design. More details could be get from official cross cluster documentation https://istio.io/latest/docs/setup/install/multicluster/ . There are also some articles and support tickets on Istio mentiones that after Istio 1.6 old Cluster Service Entry Cross Cluster Design did not work as expected and it's like broken for a while ( https://github.com/istio/istio/issues/29308#issuecomment-736899243 ). With this article I plan to give similar examples like Official Istio web site with some more or less definitions.
 
-Here I am using 3 geographical seperated clusters named C1, C2 and C3. They have different region and zone structure. You could use any cluster installed on any cloud provider or onpremise platform. Important thing here is if you dont have zone and region defined on your cluster you need to define it like below or if you already have that definitions(GCP, AWS, Azure has built in defined) its important to update the scenarios below to reflect your actual region, zone setup. By using Multi Primary Remote Multi Cluster Setup its important that Load Balancer VIPS needs to be accesible by all 3 clusters.
+Here I am using 3 geographical separated clusters named C1, C2 and C3. They have different region and zone structure. You could use any cluster installed on any cloud provider or on-premise platform. Important thing here is if you don't have zone and region defined on your cluster you need to define it like below or if you already have that definitions (GCP, AWS, Azure has built in defined) it's important to update the scenarios below to reflect your actual region, zone setup. By using Multi Primary Remote Multi Cluster Setup it's important that Load Balancer VIPS needs to be accessible by all 3 clusters.
 
-Here i am using 3 clusters installed by Kubeadm project, each cluster has 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks under the same mesh topology. So generally all pods, services are isolated from each other, they could not directly communicate with each other via CNI. You could think these 3 clusters as clusters like in London, New York, Tokyo cities. You could get more data over the https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network link which give more details about how data flows from one clusters service to other.
+Here i am using 3 clusters installed by Kubeadm project, each cluster has 3 or 5 worker nodes. I am using a Multi Primary Cluster Architecture over different networks under the same mesh topology. So generally, all pods, services are isolated from each other, they could not directly communicate with each other via CNI. You could think these 3 clusters as clusters like in London, New York, Tokyo cities. You could get more data over the https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network link which give more details about how data flows from one cluster service to other.
 
-I use Istio Operator to manage Istio installation because it looks like its more native and used by most of the contributors and also has strong abilities fot Cluster Upgrade and Troubleshooting. 
+I use Istio Operator to manage Istio installation because it looks like it's more native and used by most of the contributors and also has strong abilities for Cluster Upgrade and Troubleshooting. 
 
 I also like to mention that each cluster is using same root CA that enables trust for each other, with this setup no federation required between them. https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/
 
 I also enabled Istio Smart DNS Proxy to test how it works on cross cluster setup. It has a seamless integration with across multiple cluster and Virtual machines. 
 
-I generally used the cross cluster examples which are detailed on current with Istio Install bundle, generally nothing special here, only the official documentation is somekind of complex to understand for a newcomer. I also executed all commands from my Mac, you could easily use this commands from other platforms with some minor modifications.
+I generally used the cross cluster examples which are detailed on current with Istio Install bundle, generally nothing special here, only the official documentation is some kind of complex to understand for a newcomer. I also executed all commands from my Mac, you could easily use these commands from other platforms with some minor modifications.
 
-Cross Cluster Nodes are using the below zone and region distribution. Each regions have different zones so zone1 from region1 is not zone as zone1 from region2
+Cross Cluster Nodes are using the below zone and region distribution. Each region have different zones so zone1 from region1 is not zone as zone1 from region2
 
 Cluster | Node | Region | Zone
 -- | --| -- | --
@@ -34,9 +34,9 @@ C3 | c3n3 | region3 | zone2
 We use c1-admin, c2-admin, c3-admin kubectl contexts to reach clusters via kubectl or istioctl
 
 # We follow the below steps to build up a 3 node CC Cluster
-1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a seperate vm. 
+1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a separate vm. 
 1. Label Nodes with Specific Region and Zone (if you do not have these)
-1. Generate Common CA for all clusters and generate tls secret for Istiod
+1. Generate Common CA for all clusters and generate TLS secret for Istiod
 1. Deploy Istio Operator
 1. Deploy Istiod
 1. Deploy East-West Ingress GW to handle CC Communication
@@ -205,7 +205,7 @@ spec:
 EOF
 ```
 
-Check all pods under istio-system are in Ready State before continue to next step
+Check all pods under istio-system are in Ready State before continuing to next step
 
 ## Deploy East-West Ingress GW 
 ```
@@ -285,7 +285,7 @@ Hello version: c2z4, instance: helloworld2-c2z4-6b575f445b-9bngd
 ## CC2: Locality Aware Load Balancing
 Here we are defining Locality Aware Prioritised Load Balancing on C1. With this setup below our data transfer stays under same zone and
 it did not travel to other zones until there is a problem on current zone. This locality aware approach is important because most Cloud 
-Providers extra charge the data which travels between zones while they actually dont charge data which remains under the same zone.
+Providers extra charge the data which travels between zones while they actually don't charge data which remains under the same zone.
 
 First lets check that we got reply from all zones
 ``` bash
@@ -378,7 +378,7 @@ kubectl delete --context=c1-admin -n sample dr/helloworld2-loc1
 
 ## CC3: Locality Weighted Distribution Load Balancing
 Here we are defining Locality Weighted Distribution Load Balancing. With this setup we could redirect, control traffic from or to with a weighted distribution.
-For example we could divert coming from region1 zone1 to 50% region2 20% region3 and 30% to region4. So we could control traffic flow.
+For example, we could divert coming from region1 zone1 to 50% region2 20% region3 and 30% to region4. So we could control traffic flow.
 
 First lets check that we got reply from all zones
 ``` bash
@@ -399,8 +399,8 @@ First Rule: Traffic coming from region2, zone1 distributed 50/50 to region1 and 
 Second Rule traffic coming from region2 zone2 will be distributed to region2 and region3
 Third Rule traffic coming from region2 zone3 will be redirected all to region4, zone5 
 
-Note: We could not control destination traffic on zone basis if from and to traffic is on different regions. 
-If they are on same region we could control destination zone.
+Note: We could not control destination traffic on zone basis if from and to traffic is on different clusters. 
+If they are on same cluster, we could control destination zone.
 ``` bash
 kubectl apply --context=c2-admin -n sample -f - <<EOF
 apiVersion: networking.istio.io/v1alpha3
@@ -606,7 +606,7 @@ When we drain the helloworld2 pod on region4 zone5 this time traffic needs to be
 kubectl exec --context=c2-admin -n sample -c istio-proxy $(kubectl --context=c2-admin -n sample get pods -l version=c2z5,app=helloworld2 -o jsonpath='{.items[0].metadata.name}')  -- curl -sSL -X POST 127.0.0.1:15000/drain_listeners
 ```
 
-Check the traffic again in region4 you will see that its diverted to region3
+Check the traffic again in region4 you will see that it's diverted to region3
 ``` bash
 for count in `seq 1 5`; do
     kubectl exec --context=c2-admin -n sample -c sleep sleepz4 -- curl -sS helloworld2.sample:5000/hello
@@ -628,7 +628,7 @@ kubectl delete --context=c2-admin -n sample dr/helloworld2-loc-failover
 ```
 
 # Testing Istio DNS Proxy
-With this new DNS Proxy Addon, DNS queries can be cached and controlled directly on Istio Sidecars, this reduces queries send to Kubernetes DNS Server(kube-dns deployment) and has some additional functional benefits. In general all dns requests coming from application pod is redirected to kube-dns server via Istio sidecar this requests to kube-dns service and then sends reply to application. With this adaptation here Istio Sidecar has a caching DNS daemon, it caches requests and replies this requests to the application. This approach has some editional benefits listed below:
+With this new DNS Proxy Addon, DNS queries can be cached and controlled directly on Istio Sidecars, this reduces queries send to Kubernetes DNS Server(kube-dns deployment) and has some additional functional benefits. In general all dns requests coming from application pod is redirected to kube-dns server via Istio sidecar this requests to kube-dns service and then sends reply to application. With this adaptation here Istio Sidecar has a caching DNS daemon, it caches requests and replies this requests to the application. This approach has some additional benefits listed below:
 * VM access to Kubernetes services
 * Access external services without VIPs
 * Resolving DNS for services in remote clusters
