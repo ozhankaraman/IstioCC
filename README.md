@@ -209,9 +209,9 @@ Check all pods under istio-system are in Ready State before continuing to next s
 
 ## Deploy East-West Ingress GW 
 ```
-istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster1 --network network1 | istioctl --context=c1-admin install -y -f -
-istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster2 --network network2 | istioctl --context=c2-admin install -y -f -
-istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster3 --network network3 | istioctl --context=c3-admin install -y -f -
+./istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster1 --network network1 | ./istio-1.9.0/bin/istioctl --context=c1-admin install -y -f -
+./istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster2 --network network2 | ./istio-1.9.0/bin/istioctl --context=c2-admin install -y -f -
+./istio-1.9.0/samples/multicluster/gen-eastwest-gateway.sh --mesh mesh1 --cluster cluster3 --network network3 | ./istio-1.9.0/bin/istioctl --context=c3-admin install -y -f -
 ```
 
 ## Expose Services on Clusters
