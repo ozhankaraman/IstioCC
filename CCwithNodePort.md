@@ -1,5 +1,5 @@
 # Istio Version 1.9 Cross Cluster with Node Port Setup
-We will build a cluster which is using NodePort for Ingress and East West Gateway. We are utilising [Ha Proxy](http://www.haproxy.org) TCP Load Balancer for layer 4 routing. You could use the [generate_haproxy_cfg_for_istio.sh script](https://github.com/ozhankaraman/IstioCC/blob/main/generate_haproxy_cfg_for_istio.sh) in this repo to generate required config for HaProxy.
+We will build a cluster which is using NodePort for Ingress and East West Gateway. We are utilising [HA Proxy](http://www.haproxy.org) TCP Load Balancer for layer 4 routing. You could use the [generate_haproxy_cfg_for_istio.sh](https://github.com/ozhankaraman/IstioCC/blob/main/generate_haproxy_cfg_for_istio.sh) script in this repo to generate required config for HAProxy.
 
 We will use the cluster below to demonstrate NodePort setup for Cross Cluster Communication.
 

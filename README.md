@@ -34,7 +34,7 @@ C3 | c3n3 | region3 | zone2
 We use c1-admin, c2-admin, c3-admin kubectl contexts to reach clusters via kubectl or istioctl
 
 # We follow the below steps to build up a 3 node CC Cluster
-1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a separate vm. If you are using NodePort as Load Balancer you need to use the [CCwithNodePort.md document](https://github.com/ozhankaraman/IstioCC/blob/main/CCwithNodePort.md) in this repo.
+1. Deploy simple Kubernetes 1.20.4 cluster with Load Balancer Setup. I used MetalLB because my cluster is working over Linux KVM VM's and generally each node is a separate vm. If you are using NodePort as Load Balancer you need to use the [CCwithNodePort.md](https://github.com/ozhankaraman/IstioCC/blob/main/CCwithNodePort.md) document in this repo.
 1. Label Nodes with Specific Region and Zone (if you do not have these)
 1. Generate Common CA for all clusters and generate TLS secret for Istiod
 1. Deploy Istio Operator
