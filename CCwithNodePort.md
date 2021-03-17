@@ -1,7 +1,7 @@
 # Istio Version 1.9 Cross Cluster with Node Port Setup
-We will build a cluster which is using NodePort for Ingress and East West GW on backend. We are utilising HaProxy tcp loadbalancer for layer 4 routing. You could use the script in this repo (generate_haproxy_cfg_for_istio.sh) to generate required config for HaProxy.
+We will build a cluster which is using NodePort for Ingress and East West Gateway. We are utilising [Ha Proxy](http://www.haproxy.org) TCP Load Balancer for layer 4 routing. You could use the [generate_haproxy_cfg_for_istio.sh script](https://github.com/ozhankaraman/IstioCC/blob/main/generate_haproxy_cfg_for_istio.sh) in this repo to generate required config for HaProxy.
 
-We will use the cluster below to demonstrate nodeport setup for Cross Cluster Communication.
+We will use the cluster below to demonstrate NodePort setup for Cross Cluster Communication.
 
 Cluster | Node | Region | Zone
 -- | --| -- | --
@@ -19,7 +19,7 @@ H3 | h3n1 | region3 | zone1
 H3 | h3n2 | region3 | zone2
 H3 | h3n3 | region3 | zone2
 
-VIP's defined over HA Proxy Load Balancer are below 
+VIP definitions for HA Proxy Load Balancer are below:
 
 Cluster | Type | VIP
 -- | -- | --
@@ -574,7 +574,7 @@ kubectl --context=h2-admin apply -n sample -f sleep.yaml
 kubectl --context=h3-admin apply -n sample -f sleep.yaml
 ```
 
-# Checking simple Cross Cluster Connection
+# Check Cross Cluster Communication
 Here we send a request from sleepz2 pod(C1 Cluster, Region1, Zone2, Sample NS) to helloworld2 service
 and we got replies from the pods in 3 Clusters, so we could say Yes Cross Cluster communication is working
 
@@ -594,3 +594,5 @@ Hello version: h1z1, instance: helloworld2-h1z1-b89ffc768-2q2br
 Hello version: h1z3, instance: helloworld2-h1z3-7df4d6c9db-b4bhf
 Hello version: h1z2, instance: helloworld2-h1z2-6c95dfd98d-5q5fl
 ```
+
+You could whole complete Cross Cluster Scenarios from [this link](https://github.com/ozhankaraman/IstioCC#cross-cluster-scenarios)
