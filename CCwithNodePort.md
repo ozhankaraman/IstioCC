@@ -66,6 +66,7 @@ kubectl --context=h3-admin label nodes h3n2 --overwrite topology.kubernetes.io/r
 kubectl --context=h3-admin label nodes h3n2 --overwrite topology.kubernetes.io/zone=zone2
 kubectl --context=h3-admin label nodes h3n3 --overwrite topology.kubernetes.io/region=region3
 kubectl --context=h3-admin label nodes h3n3 --overwrite topology.kubernetes.io/zone=zone3
+```
 
 ## Generate Common CA for all clusters and generate tls secret for Istiod
 ``` bash
