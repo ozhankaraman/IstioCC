@@ -2,7 +2,6 @@
 
 rm -f /root/haproxy-istio
 
-
 cat << EOF > /root/haproxy-istio
 # Istio CC NodePort Definitions for HAProxy
 #
