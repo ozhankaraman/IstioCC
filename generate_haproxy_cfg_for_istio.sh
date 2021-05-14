@@ -9,6 +9,20 @@ cat << EOF > /root/haproxy-istio
 # h1 -> h1n1, h1n2, h1n3
 # h2 -> h2n1, h2n2, h2n3, h2n4, h2n5
 # h3 -> h3n1, h3n2, h3n3
+#
+# Istio Component Port Distribution
+# ingress gw
+# 15021 -> status-port
+# 80    -> http2
+# 443   -> https
+# 15012 -> tcp-istiod
+# 15443 -> tls
+#
+# east west gw
+# 15021 -> status-port
+# 15443 -> tls
+# 15012 -> tls-istiod
+# 15017 -> tls-webhook
 
 EOF
 
