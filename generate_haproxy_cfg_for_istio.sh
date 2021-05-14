@@ -2,8 +2,17 @@
 
 rm -f /root/haproxy-istio
 
-# ingress
-echo "Istio CC NodePort Definitions for HAProxy" >> /root/haproxy-istio
+
+cat << EOF > /root/haproxy-istio
+# Istio CC NodePort Definitions for HAProxy
+#
+# Current Worker Node List
+# h1 -> h1n1, h1n2, h1n3
+# h2 -> h2n1, h2n2, h2n3, h2n4, h2n5
+# h3 -> h3n1, h3n2, h3n3
+
+EOF
+
 for ports in 1:15021:32170 1:80:30380 1:443:30633 1:15012:32395 1:15443:30495 2:15021:32171 2:15443:31495 2:15012:31396 2:15017:31397
 do
     id=`echo $ports|cut -d: -f1`
