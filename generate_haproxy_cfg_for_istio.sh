@@ -1,8 +1,10 @@
 #!/bin/sh -e
 
-rm -f /root/haproxy-istio
+OUTPUT_FILE=/root/haproxy-istio
 
-cat << EOF > /root/haproxy-istio
+###
+
+cat << EOF > $OUTPUT_FILE
 # Istio CC NodePort Definitions for HAProxy
 #
 # Current Worker Node List
@@ -38,7 +40,7 @@ do
         istioComponent="istio-eastwestgateway"
     fi
 
-cat << EOF >> /root/haproxy-istio
+cat << EOF >> $OUTPUT_FILE
 #### vip${id} ${istioComponent}
 frontend h1-${istioComponent}-frontend-vip${id}-${port}
     bind h1-vip${id}.zz.zebrastack.com:${port}
