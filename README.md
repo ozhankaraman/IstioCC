@@ -221,7 +221,7 @@ kubectl --context=c2-admin apply -n istio-system -f ./istio-1.9.0/samples/multic
 kubectl --context=c3-admin apply -n istio-system -f ./istio-1.9.0/samples/multicluster/expose-services.yaml
 ```
 
-## Deploy Remote Secret for Endpoint Discovery on Clusters
+## Deploy Remote Secret to Enable Endpoint Discovery on Clusters
 ``` bash
 # Deploy Remote Secret on c1 that provides >>Access to>> c2, c3 API Servers  || c1 >> c2, c3
 ./istio-1.9.0/bin/istioctl x create-remote-secret --context=c2-admin --name=cluster2 | kubectl apply -f - --context=c1-admin
