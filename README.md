@@ -736,3 +736,8 @@ Scenario Cleanup
 kubectl --context=c1-admin -n sample delete se/mysql-db-1
 kubectl --context=c1-admin -n sample delete se/mysql-db-2
 ```
+
+# Resources
+* https://istio.io/latest/docs/ops/deployment/deployment-models/#single-network
+* https://istio.io/latest/docs/setup/install/multicluster/multi-primary_multi-network/
+* https://cloud.google.com/architecture/building-a-multi-cluster-service-mesh-on-gke-using-replicated-control-plane-architecture
